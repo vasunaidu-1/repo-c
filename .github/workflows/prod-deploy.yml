@@ -1,0 +1,23 @@
+name: Prod Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      region:
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.repository }}
+      tag: ${{ inputs.tag }}
+      environment: ${{ inputs.environment }}
+      region: ${{ inputs.region }}
