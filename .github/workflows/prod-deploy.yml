@@ -1,4 +1,4 @@
-name: Prod Deploy
+name: Production Deployment
 
 on:
   workflow_dispatch:
@@ -15,6 +15,7 @@ on:
 
 jobs:
   deploy:
+    name: "🚀 Deploy Application" 
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.repository }}
