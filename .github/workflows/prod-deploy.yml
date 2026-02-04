@@ -1,5 +1,7 @@
 name: Production Change
 
+run-name: >
+  Production Change      ${{ inputs.action == 'rollback' && 'rollback' || 'deployment' }}
 on:
   workflow_dispatch:
     inputs:
