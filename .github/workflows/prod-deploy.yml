@@ -1,24 +1,32 @@
-name: Production Deployment
+name: Production Change
 
 on:
   workflow_dispatch:
     inputs:
       tag:
         required: true
-        type: string
       environment:
         required: true
-        type: string
       region:
         required: true
-        type: string
+      action:
+        required: true
 
 jobs:
-  deploy:
-    name: " Deploy Application" 
-    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-    with:
-      service: ${{ github.repository }}
-      tag: ${{ inputs.tag }}
-      environment: ${{ inputs.environment }}
-      region: ${{ inputs.region }}
+  change:
+    name: "${{ inputs.action == 'rollback' && '↩ Rollback Service' || ' Deploy Service' }}"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Apply change
+        run: |
+          if [ "${{ inputs.action }}" = "rollback" ]; then
+            echo "Rollback Service : ${{ github.repository }}"
+            echo "Rollback Version : ${{ inputs.tag }}"
+          else
+            echo "Deploy Service   : ${{ github.repository }}"
+            echo "Deploy Version   : ${{ inputs.tag }}"
+          fi
+
+          echo "Environment : ${{ inputs.environment }}"
+          echo "Region      : ${{ inputs.region }}"
