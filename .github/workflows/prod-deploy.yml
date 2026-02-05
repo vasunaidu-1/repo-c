@@ -9,20 +9,19 @@ on:
       environment:
         required: true
         type: string
-      region:
-        required: true
-        type: string
 
 jobs:
-  deploy:
-    name: Prod Deploy
+  approval:
+    runs-on: ubuntu-latest
     environment: prod-approval
+    steps:
+      - run: echo "Deployment approved"
 
-    # 👇 THIS JOB CALLS THE SHARED WORKFLOW
+  deploy:
+    needs: approval
     uses: vasunaidu-2/shared-deploy/.github/workflows/shared-deploy.yml@main
-
     with:
       service: ${{ github.repository }}
       tag: ${{ inputs.tag }}
       environment: ${{ inputs.environment }}
-      region: ${{ inputs.region }}
+      region: us-west-2
