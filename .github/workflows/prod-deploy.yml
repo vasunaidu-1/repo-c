@@ -7,16 +7,16 @@ on:
         required: true
       environment:
         required: true
+      region:
+        required: true
 
 jobs:
   deploy:
     name: Prod Deploy
-    runs-on: ubuntu-latest
     environment: prod-approval
-
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          echo "Repo: ${{ github.repository }}"
-          echo "Version: ${{ inputs.tag }}"
-          echo "Environment: ${{ inputs.environment }}"
+    uses: vasunaidu-2/shared-deploy/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.repository }}
+      tag: ${{ inputs.tag }}
+      environment: ${{ inputs.environment }}
+      region: ${{ inputs.region }}
