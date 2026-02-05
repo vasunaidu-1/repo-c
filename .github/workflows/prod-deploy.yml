@@ -1,7 +1,3 @@
-# =========================================================
-# repo-a / repo-b / repo-c
-# .github/workflows/prod-deploy.yml
-# =========================================================
 name: Prod Deploy
 
 on:
@@ -9,7 +5,7 @@ on:
     inputs:
       tag:
         required: true
-      region:
+      environment:
         required: true
 
 jobs:
@@ -21,6 +17,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          echo "Repository: ${{ github.repository }}"
+          echo "Repo: ${{ github.repository }}"
           echo "Version: ${{ inputs.tag }}"
-          echo "Region: ${{ inputs.region }}"
+          echo "Environment: ${{ inputs.environment }}"
