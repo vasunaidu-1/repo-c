@@ -1,7 +1,5 @@
-name: Production Change
+name: Prod Deploy
 
-run-name: >
-  Production Change      ${{ inputs.action == 'rollback' && 'rollback' || 'deployment' }}
 on:
   workflow_dispatch:
     inputs:
@@ -9,26 +7,26 @@ on:
         required: true
       environment:
         required: true
-      region:
-        required: true
       action:
         required: true
 
 jobs:
-  change:
-    name: "${{ inputs.action == 'rollback' && '↩ Rollback Service' || ' Deploy Service' }}"
+  deploy:
+    name: Deploy to Prod
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Apply change
-        run: |
-          if [ "${{ inputs.action }}" = "rollback" ]; then
-            echo "Rollback Service : ${{ github.repository }}"
-            echo "Rollback Version : ${{ inputs.tag }}"
-          else
-            echo "Deploy Service   : ${{ github.repository }}"
-            echo "Deploy Version   : ${{ inputs.tag }}"
-          fi
+    # ✅ APPROVAL GATE LIVES HERE
+    environment: ${{ inputs.environment }}
 
-          echo "Environment : ${{ inputs.environment }}"
-          echo "Region      : ${{ inputs.region }}"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy
+        run: |
+          echo "Repo: ${{ github.repository }}"
+          echo "Action: ${{ inputs.action }}"
+          echo "Version: ${{ inputs.tag }}"
+          echo "Environment: ${{ inputs.environment }}"
+
+          # real deploy command here
