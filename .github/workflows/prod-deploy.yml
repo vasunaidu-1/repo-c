@@ -1,3 +1,7 @@
+# =========================================================
+# repo-a / repo-b / repo-c
+# .github/workflows/prod-deploy.yml
+# =========================================================
 name: Prod Deploy
 
 on:
@@ -7,26 +11,16 @@ on:
         required: true
       environment:
         required: true
-      action:
-        required: true
 
 jobs:
   deploy:
-    name: Deploy to Prod
+    name: Prod Deploy
     runs-on: ubuntu-latest
-
-    # ✅ APPROVAL GATE LIVES HERE
     environment: ${{ inputs.environment }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Deploy
-        run: |
-          echo "Repo: ${{ github.repository }}"
-          echo "Action: ${{ inputs.action }}"
+      - uses: actions/checkout@v4
+      - run: |
+          echo "Repository: ${{ github.repository }}"
           echo "Version: ${{ inputs.tag }}"
           echo "Environment: ${{ inputs.environment }}"
-
-          # real deploy command here
