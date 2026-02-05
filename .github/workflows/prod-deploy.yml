@@ -14,8 +14,14 @@ on:
         type: string
 
 jobs:
+  approval:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - run: echo "✅ Repo-level approval granted"
+
   deploy:
-    name: " Deploy Application" 
+    needs: approval
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.repository }}
