@@ -5,16 +5,22 @@ on:
     inputs:
       tag:
         required: true
+        type: string
       environment:
         required: true
+        type: string
       region:
         required: true
+        type: string
 
 jobs:
   deploy:
     name: Prod Deploy
     environment: prod-approval
+
+    # 👇 THIS JOB CALLS THE SHARED WORKFLOW
     uses: vasunaidu-2/shared-deploy/.github/workflows/shared-deploy.yml@main
+
     with:
       service: ${{ github.repository }}
       tag: ${{ inputs.tag }}
