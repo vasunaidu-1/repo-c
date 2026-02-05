@@ -1,4 +1,4 @@
-name: Prod Deploy
+name: Production Deployment
 
 on:
   workflow_dispatch:
@@ -9,19 +9,16 @@ on:
       environment:
         required: true
         type: string
+      region:
+        required: true
+        type: string
 
 jobs:
-  approval:
-    runs-on: ubuntu-latest
-    environment: prod-approval
-    steps:
-      - run: echo "Deployment approved"
-
   deploy:
-    needs: approval
-    uses: vasunaidu-2/shared-deploy/.github/workflows/shared-deploy.yml@main
+    name: " Deploy Application" 
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.repository }}
       tag: ${{ inputs.tag }}
       environment: ${{ inputs.environment }}
-      region: us-west-2
+      region: ${{ inputs.region }}
