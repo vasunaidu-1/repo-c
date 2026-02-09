@@ -1,31 +1,179 @@
-name: Production Deployment
+name: Prod Orchestrator
+run-name: prod-orchestrator-${{ inputs.action }}
 
 on:
   workflow_dispatch:
     inputs:
-      tag:
-        required: true
-        type: string
+      action:
+        type: choice
+        options: [deployment, rollback]
+        default: deployment
       environment:
-        required: true
-        type: string
-      region:
-        required: true
-        type: string
+        type: choice
+        options: [prod-west, prod-east]
+        default: prod-west
 
+# =========================================================
+# BUILD PLAN
+# =========================================================
 jobs:
+  orchestrate:
+    name: Build Release Plan
+    runs-on: ubuntu-latest
+    outputs:
+      plan_b64: ${{ steps.plan.outputs.plan_b64 }}
+      region: ${{ steps.set-region.outputs.region }}
+      has_repo_a: ${{ steps.plan.outputs.has_repo_a }}
+      has_repo_b: ${{ steps.plan.outputs.has_repo_b }}
+      has_repo_c: ${{ steps.plan.outputs.has_repo_c }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set region
+        id: set-region
+        run: |
+          if [[ "${{ inputs.environment }}" == "prod-west" ]]; then
+            echo "region=us-west-2" >> "$GITHUB_OUTPUT"
+          else
+            echo "region=us-east-1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          wget -q https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x yq_linux_amd64
+          sudo mv yq_linux_amd64 /usr/local/bin/yq
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ steps.set-region.outputs.region }}
+
+      - name: Download manifest
+        run: |
+          aws s3 cp s3://mos-deploy-manifests/${{ inputs.action }}-manifest.yaml manifest.yaml
+
+      - name: Build plan and summary
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REGION="${{ steps.set-region.outputs.region }}"
+          DATA=$(yq -o=json ".\"$REGION\"" manifest.yaml)
+
+          HAS_A=false
+          HAS_B=false
+          HAS_C=false
+          PLAN_JSON='[]'
+
+          echo "## prod-${{ inputs.environment }} Build & Release Plan" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Operation:** ${{ inputs.action }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Environment:** ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | Version |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|---------|" >> "$GITHUB_STEP_SUMMARY"
+
+          for repo in repo-a repo-b repo-c; do
+            VERSION=$(echo "$DATA" | jq -r ".\"$repo\".version // empty")
+
+            if [[ "$VERSION" == "NA" ]]; then
+              echo "| $repo | Skipped (version = NA) |" >> "$GITHUB_STEP_SUMMARY"
+
+            elif [[ -n "$VERSION" && "$VERSION" != "null" && "$VERSION" != "not_applicable" ]]; then
+              echo "| $repo | v$VERSION |" >> "$GITHUB_STEP_SUMMARY"
+              PLAN_JSON=$(echo "$PLAN_JSON" | jq ". + [{\"repo\":\"$repo\",\"version\":\"$VERSION\"}]")
+
+              [[ "$repo" == "repo-a" ]] && HAS_A=true
+              [[ "$repo" == "repo-b" ]] && HAS_B=true
+              [[ "$repo" == "repo-c" ]] && HAS_C=true
+            fi
+          done
+
+          echo "plan_b64=$(echo "$PLAN_JSON" | base64 -w0)" >> "$GITHUB_OUTPUT"
+          echo "has_repo_a=$HAS_A" >> "$GITHUB_OUTPUT"
+          echo "has_repo_b=$HAS_B" >> "$GITHUB_OUTPUT"
+          echo "has_repo_c=$HAS_C" >> "$GITHUB_OUTPUT"
+
+# =========================================================
+# APPROVAL
+# =========================================================
   approval:
+    name: Approve Release Plan
+    needs: orchestrate
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
-      - run: echo "Repo-level approval granted"
+      - run: echo "Approved"
 
-  deploy:
-    needs: approval
-    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-    with:
-      
-      service: ${{ github.event.repository.name }}
-      tag: ${{ inputs.tag }}
-      environment: ${{ inputs.environment }}
-      region: ${{ inputs.region }}
+# =========================================================
+# TRIGGERS
+# =========================================================
+  trigger-repo-a:
+    name: Trigger repo-a
+    if: needs.orchestrate.outputs.has_repo_a == 'true'
+    needs: [orchestrate, approval]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger repo-a
+        run: |
+          PLAN=$(echo "${{ needs.orchestrate.outputs.plan_b64 }}" | base64 -d)
+          VERSION=$(echo "$PLAN" | jq -r '.[] | select(.repo=="repo-a") | .version')
+
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.ORG1_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/vasunaidu-1/repo-a/actions/workflows/prod-deploy.yml/dispatches \
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag\":\"$VERSION\",\"environment\":\"${{ inputs.environment }}\",\"region\":\"${{ needs.orchestrate.outputs.region }}\"}}"
+
+      - name: Trigger summary
+        run: |
+          echo "## prod-${{ inputs.environment }} Repositories Triggered" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Repository | Status / Approval Link |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-----------|------------------------|" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "| repo-a | https://github.com/vasunaidu-1/repo-a/actions/workflows/prod-deploy.yml |" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ needs.orchestrate.outputs.has_repo_b }}" == "true" ]]; then
+            echo "| repo-b | https://github.com/vasunaidu-1/repo-b/actions/workflows/prod-deploy.yml |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| repo-b | Skipped (version = NA) |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [[ "${{ needs.orchestrate.outputs.has_repo_c }}" == "true" ]]; then
+            echo "| repo-c | https://github.com/vasunaidu-1/repo-c/actions/workflows/prod-deploy.yml |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| repo-c | Skipped |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  trigger-repo-b:
+    name: Trigger repo-b
+    if: needs.orchestrate.outputs.has_repo_b == 'true'
+    needs: [orchestrate, approval]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "repo-b triggered"
+
+  trigger-repo-c:
+    name: Trigger repo-c
+    if: needs.orchestrate.outputs.has_repo_c == 'true'
+    needs: [orchestrate, approval]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger repo-c
+        run: |
+          PLAN=$(echo "${{ needs.orchestrate.outputs.plan_b64 }}" | base64 -d)
+          VERSION=$(echo "$PLAN" | jq -r '.[] | select(.repo=="repo-c") | .version')
+
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.ORG1_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/vasunaidu-1/repo-c/actions/workflows/prod-deploy.yml/dispatches \
+            -d "{\"ref\":\"main\",\"inputs\":{\"tag\":\"$VERSION\",\"environment\":\"${{ inputs.environment }}\",\"region\":\"${{ needs.orchestrate.outputs.region }}\"}}"
