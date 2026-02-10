@@ -1,31 +1,24 @@
-name: Production Deployment
+name: Prod Deploy
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        required: true
-        type: string
-      environment:
-        required: true
-        type: string
-      region:
-        required: true
-        type: string
+  repository_dispatch:
+    types: [prod-deploy]
 
 jobs:
-  approval:
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - run: echo "Repo-level approval granted"
-
   deploy:
-    needs: approval
-    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-    with:
-      
-      service: ${{ github.event.repository.name }}
-      tag: ${{ inputs.tag }}
-      environment: ${{ inputs.environment }}
-      region: ${{ inputs.region }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate trigger source
+        run: |
+          echo "Triggered by orchestrator"
+
+      - name: Read payload
+        run: |
+          echo "Tag: ${{ github.event.client_payload.tag }}"
+          echo "Environment: ${{ github.event.client_payload.environment }}"
+          echo "Region: ${{ github.event.client_payload.region }}"
+
+      - name: Deploy
+        run: |
+          echo "Deploying ${{ github.event.client_payload.tag }} to ${{ github.event.client_payload.environment }}"
