@@ -1,4 +1,5 @@
 name: Production Deployment
+run-name: prod-${{ github.event.client_payload.operation || inputs.operation }}
 
 on:
   # =========================
