@@ -4,40 +4,47 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag"
         required: true
+        type: string
       environment:
-        description: "Target environment"
         required: true
+        type: string
+      region:
+        required: true
+        type: string
+
   repository_dispatch:
     types: [prod-deploy]
 
+# =========================================================
+# MANUAL RUN → APPROVAL REQUIRED
+# =========================================================
 jobs:
-  deploy:
+  approval-manual:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-
-    # 🔐 Approval ONLY for MANUAL runs
-    environment: >
-      ${{ github.event_name == 'workflow_dispatch'
-          && 'manual-prod-approval'
-          || '' }}
-
+    environment: manual-prod-approval
     steps:
-      - name: Identify trigger source
-        run: |
-          echo "Triggered by: ${{ github.event_name }}"
+      - run: echo "Manual deployment approved"
 
-      - name: Resolve inputs
-        run: |
-          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
-            echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
-            echo "ENV=${{ github.event.client_payload.environment }}" >> $GITHUB_ENV
-            echo "REGION=${{ github.event.client_payload.region }}" >> $GITHUB_ENV
-          else
-            echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
-            echo "ENV=${{ inputs.environment }}" >> $GITHUB_ENV
-          fi
+  deploy-manual:
+    if: github.event_name == 'workflow_dispatch'
+    needs: approval-manual
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ inputs.tag }}
+      environment: ${{ inputs.environment }}
+      region: ${{ inputs.region }}
 
-      - name: Deploy
-        run: |
-          echo "Deploying $TAG to $ENV"
+# =========================================================
+# ORCHESTRATOR RUN → NO APPROVAL
+# =========================================================
+  deploy-auto:
+    if: github.event_name == 'repository_dispatch'
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ github.event.client_payload.tag }}
+      environment: ${{ github.event.client_payload.environment }}
+      region: ${{ github.event.client_payload.region }}
