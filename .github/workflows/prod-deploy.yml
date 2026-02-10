@@ -1,6 +1,14 @@
 name: Prod Deploy
 
 on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag"
+        required: true
+      environment:
+        description: "Target environment"
+        required: true
   repository_dispatch:
     types: [prod-deploy]
 
@@ -8,17 +16,28 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Validate trigger source
-        run: |
-          echo "Triggered by orchestrator"
+    # 🔐 Approval ONLY for MANUAL runs
+    environment: >
+      ${{ github.event_name == 'workflow_dispatch'
+          && 'manual-prod-approval'
+          || '' }}
 
-      - name: Read payload
+    steps:
+      - name: Identify trigger source
         run: |
-          echo "Tag: ${{ github.event.client_payload.tag }}"
-          echo "Environment: ${{ github.event.client_payload.environment }}"
-          echo "Region: ${{ github.event.client_payload.region }}"
+          echo "Triggered by: ${{ github.event_name }}"
+
+      - name: Resolve inputs
+        run: |
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
+            echo "ENV=${{ github.event.client_payload.environment }}" >> $GITHUB_ENV
+            echo "REGION=${{ github.event.client_payload.region }}" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ inputs.tag }}" >> $GITHUB_ENV
+            echo "ENV=${{ inputs.environment }}" >> $GITHUB_ENV
+          fi
 
       - name: Deploy
         run: |
-          echo "Deploying ${{ github.event.client_payload.tag }} to ${{ github.event.client_payload.environment }}"
+          echo "Deploying $TAG to $ENV"
