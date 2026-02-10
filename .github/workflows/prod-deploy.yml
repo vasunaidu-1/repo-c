@@ -30,7 +30,7 @@ on:
 
 jobs:
 # =========================================================
-# MANUAL RUN – PROD WEST (APPROVAL REQUIRED)
+# MANUAL – PROD WEST (APPROVAL)
 # =========================================================
   approval-prod-west:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
@@ -53,7 +53,7 @@ jobs:
       operation: ${{ inputs.operation }}
 
 # =========================================================
-# MANUAL RUN – PROD EAST (APPROVAL REQUIRED)
+# MANUAL – PROD EAST (APPROVAL)
 # =========================================================
   approval-prod-east:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
@@ -76,7 +76,7 @@ jobs:
       operation: ${{ inputs.operation }}
 
 # =========================================================
-# ORCHESTRATOR RUN – NO APPROVAL
+# ORCHESTRATOR – NO APPROVAL
 # =========================================================
   deploy-auto:
     if: github.event_name == 'repository_dispatch'
