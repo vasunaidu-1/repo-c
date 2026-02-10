@@ -1,4 +1,4 @@
-name: Production Deployment
+name: Production ${{ inputs.operation || github.event.client_payload.operation || 'Deployment' }}
 
 on:
   # =========================
@@ -15,6 +15,12 @@ on:
         options:
           - prod-west
           - prod-east
+      operation:
+        required: true
+        type: choice
+        options:
+          - deployment
+          - rollback
 
   # =========================
   # ORCHESTRATOR TRIGGER
@@ -42,6 +48,7 @@ jobs:
       tag: ${{ inputs.tag }}
       environment: prod-west
       region: us-west-2
+      operation: ${{ inputs.operation }}
 
 # =========================================================
 # MANUAL RUN – PROD EAST (APPROVAL REQUIRED)
@@ -62,9 +69,10 @@ jobs:
       tag: ${{ inputs.tag }}
       environment: prod-east
       region: us-east-1
+      operation: ${{ inputs.operation }}
 
 # =========================================================
-# ORCHESTRATOR RUN – NO APPROVAL (REGION DERIVED)
+# ORCHESTRATOR RUN – NO APPROVAL
 # =========================================================
   deploy-auto:
     if: github.event_name == 'repository_dispatch'
@@ -74,3 +82,4 @@ jobs:
       tag: ${{ github.event.client_payload.tag }}
       environment: ${{ github.event.client_payload.environment }}
       region: ${{ github.event.client_payload.environment == 'prod-west' && 'us-west-2' || 'us-east-1' }}
+      operation: ${{ github.event.client_payload.operation }}
