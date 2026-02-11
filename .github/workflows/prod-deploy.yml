@@ -30,7 +30,7 @@ jobs:
 # =========================================================
 
   approval-prod-west:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
     name: Approval – prod-west
     runs-on: ubuntu-latest
     environment: prod-west
@@ -38,7 +38,7 @@ jobs:
       - run: echo "Approved prod-west"
 
   deploy-prod-west:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
     name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west
     needs: approval-prod-west
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
@@ -54,7 +54,7 @@ jobs:
 # =========================================================
 
   approval-prod-east:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
     name: Approval – prod-east
     runs-on: ubuntu-latest
     environment: prod-east
@@ -62,7 +62,7 @@ jobs:
       - run: echo "Approved prod-east"
 
   deploy-prod-east:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east' }}
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
     name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east
     needs: approval-prod-east
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
@@ -78,9 +78,7 @@ jobs:
 # =========================================================
 
   deploy-auto-prod-west:
-    if: >
-      github.event_name == 'repository_dispatch' &&
-      github.event.client_payload.environment == 'prod-west'
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-west'
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -95,20 +93,15 @@ jobs:
 # =========================================================
 
   verify-west-before-east:
-    if: >
-      github.event_name == 'repository_dispatch' &&
-      github.event.client_payload.environment == 'prod-east'
-    name: Verify – prod-west ${{
-      github.event.client_payload.operation == 'rollback' && 'rollback' || 'deployment'
-    }} already completed
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
+    name: Verify – prod-west completed before prod-east
     runs-on: ubuntu-latest
     steps:
       - name: Check previous successful west run
         run: |
-          echo "Checking if prod-west ${{ github.event.client_payload.operation }} was completed..."
+          echo "Checking if a previous prod-west run exists..."
 
           CURRENT_RUN_ID=${{ github.run_id }}
-          OPERATION="${{ github.event.client_payload.operation }}"
 
           RESPONSE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -123,15 +116,15 @@ jobs:
             ' | head -n 1)
 
           if [ -z "$WEST_RUN" ]; then
-            echo "❌ ERROR: No previous successful prod-west $OPERATION found!"
+            echo "❌ ERROR: No previous successful prod-west run found!"
             exit 1
           fi
 
-          echo "✅ prod-west $OPERATION already completed."
+          echo "✅ Previous prod-west run found."
           echo "West Run ID: $WEST_RUN"
 
           echo "## Deployment Sequence Verification" >> $GITHUB_STEP_SUMMARY
-          echo "✅ prod-west $OPERATION already completed before prod-east." >> $GITHUB_STEP_SUMMARY
+          echo "✅ prod-west run completed before prod-east." >> $GITHUB_STEP_SUMMARY
           echo "West Run ID: $WEST_RUN" >> $GITHUB_STEP_SUMMARY
 
 # =========================================================
@@ -139,9 +132,7 @@ jobs:
 # =========================================================
 
   deploy-auto-prod-east:
-    if: >
-      github.event_name == 'repository_dispatch' &&
-      github.event.client_payload.environment == 'prod-east'
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
     needs: verify-west-before-east
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
