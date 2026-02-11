@@ -87,7 +87,7 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ===== VERIFY WEST (ONLY FOR WEST→EAST FLOW) ===========
+# ===== VERIFY WEST (ONLY FOR SEQUENCE FLOW) ============
 ###########################################################
 
   verify-west-before-east:
@@ -127,7 +127,6 @@ jobs:
 
   deploy-auto-prod-east:
     if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
-    needs: [verify-west-before-east]
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
