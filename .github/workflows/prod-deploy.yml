@@ -87,18 +87,17 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ================= ORCHESTRATOR EAST ====================
+# ===== VERIFY WEST (ONLY FOR WEST→EAST FLOW) ===========
 ###########################################################
 
-  deploy-auto-prod-east:
-    if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
-    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
+  verify-west-before-east:
+    if: >
+      github.event_name == 'repository_dispatch' &&
+      github.event.client_payload.environment == 'prod-east' &&
+      github.event.client_payload.sequence == 'west-followed-by-east'
     runs-on: ubuntu-latest
     steps:
-
-      # 🔹 VERIFY ONLY IF SEQUENCE FLOW
-      - name: Verify west completed before east
-        if: github.event.client_payload.sequence == 'west-followed-by-east'
+      - name: Validate previous west deployment
         run: |
           echo "Validating west deployment before east..."
           CURRENT_RUN_ID=${{ github.run_id }}
@@ -121,16 +120,19 @@ jobs:
           fi
 
           echo "✅ prod-west run detected."
-          echo "## 🌍 Deployment Sequence: WEST → EAST" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "✅ prod-west deployment confirmed before prod-east." >> "$GITHUB_STEP_SUMMARY"
 
-      # 🔹 REAL DEPLOY CALL
-      - name: Deploy east
-        uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-        with:
-          service: ${{ github.event.repository.name }}
-          tag: ${{ github.event.client_payload.tag }}
-          environment: prod-east
-          region: us-east-1
-          operation: ${{ github.event.client_payload.operation }}
+###########################################################
+# ================= ORCHESTRATOR EAST ====================
+###########################################################
+
+  deploy-auto-prod-east:
+    if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
+    needs: [verify-west-before-east]
+    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ github.event.client_payload.tag }}
+      environment: prod-east
+      region: us-east-1
+      operation: ${{ github.event.client_payload.operation }}
