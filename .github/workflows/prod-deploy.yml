@@ -74,11 +74,13 @@ jobs:
       operation: ${{ inputs.operation }}
 
 # =========================================================
-# ORCHESTRATOR – PROD WEST (NO APPROVAL)
+# ORCHESTRATOR – PROD WEST (ONLY WHEN WEST)
 # =========================================================
 
   deploy-auto-prod-west:
-    if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-west' }}
+    if: >
+      github.event_name == 'repository_dispatch' &&
+      github.event.client_payload.environment == 'prod-west'
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -89,19 +91,24 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 # =========================================================
-# ORCHESTRATOR – VERIFY WEST BEFORE EAST
+# VERIFY WEST BEFORE EAST (ONLY WHEN EAST)
 # =========================================================
 
   verify-west-before-east:
-    if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east' }}
-    name: Verify – prod-west already deployed
+    if: >
+      github.event_name == 'repository_dispatch' &&
+      github.event.client_payload.environment == 'prod-east'
+    name: Verify – prod-west ${{
+      github.event.client_payload.operation == 'rollback' && 'rollback' || 'deployment'
+    }} already completed
     runs-on: ubuntu-latest
     steps:
-      - name: Check previous successful west deployment
+      - name: Check previous successful west run
         run: |
-          echo "Checking if prod-west deployment was completed..."
+          echo "Checking if prod-west ${{ github.event.client_payload.operation }} was completed..."
 
           CURRENT_RUN_ID=${{ github.run_id }}
+          OPERATION="${{ github.event.client_payload.operation }}"
 
           RESPONSE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -116,23 +123,25 @@ jobs:
             ' | head -n 1)
 
           if [ -z "$WEST_RUN" ]; then
-            echo "❌ ERROR: No previous successful deployment found before this east run!"
+            echo "❌ ERROR: No previous successful prod-west $OPERATION found!"
             exit 1
           fi
 
-          echo "✅ West deployment already completed."
+          echo "✅ prod-west $OPERATION already completed."
           echo "West Run ID: $WEST_RUN"
 
           echo "## Deployment Sequence Verification" >> $GITHUB_STEP_SUMMARY
-          echo "✅ prod-west deployment already completed before prod-east." >> $GITHUB_STEP_SUMMARY
+          echo "✅ prod-west $OPERATION already completed before prod-east." >> $GITHUB_STEP_SUMMARY
           echo "West Run ID: $WEST_RUN" >> $GITHUB_STEP_SUMMARY
 
 # =========================================================
-# ORCHESTRATOR – PROD EAST (NO APPROVAL)
+# ORCHESTRATOR – PROD EAST (AFTER VERIFY)
 # =========================================================
 
   deploy-auto-prod-east:
-    if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east' }}
+    if: >
+      github.event_name == 'repository_dispatch' &&
+      github.event.client_payload.environment == 'prod-east'
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
     needs: verify-west-before-east
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
