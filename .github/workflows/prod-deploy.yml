@@ -2,6 +2,9 @@ name: Production Deployment
 run-name: prod-${{ github.event.client_payload.operation || inputs.operation }}
 
 on:
+  # =========================
+  # MANUAL TRIGGER
+  # =========================
   workflow_dispatch:
     inputs:
       tag:
@@ -20,16 +23,20 @@ on:
           - deployment
           - rollback
 
+  # =========================
+  # ORCHESTRATOR TRIGGER
+  # =========================
   repository_dispatch:
     types: [prod-deploy]
 
 jobs:
 
 # =========================================================
-# MANUAL – PROD WEST
+# MANUAL – PROD WEST (WITH APPROVAL)
 # =========================================================
   approval-prod-west:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west' }}
+    name: Approval – prod-west
     runs-on: ubuntu-latest
     environment: prod-west
     steps:
@@ -37,6 +44,7 @@ jobs:
 
   deploy-prod-west:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west' }}
+    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west
     needs: approval-prod-west
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -46,11 +54,13 @@ jobs:
       region: us-west-2
       operation: ${{ inputs.operation }}
 
+
 # =========================================================
-# MANUAL – PROD EAST
+# MANUAL – PROD EAST (WITH APPROVAL)
 # =========================================================
   approval-prod-east:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east' }}
+    name: Approval – prod-east
     runs-on: ubuntu-latest
     environment: prod-east
     steps:
@@ -58,6 +68,7 @@ jobs:
 
   deploy-prod-east:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east' }}
+    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east
     needs: approval-prod-east
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -67,11 +78,13 @@ jobs:
       region: us-east-1
       operation: ${{ inputs.operation }}
 
+
 # =========================================================
-# ORCHESTRATOR – PROD WEST
+# ORCHESTRATOR – PROD WEST (NO APPROVAL)
 # =========================================================
   deploy-auto-prod-west:
     if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-west' }}
+    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.event.repository.name }}
@@ -80,11 +93,13 @@ jobs:
       region: us-west-2
       operation: ${{ github.event.client_payload.operation }}
 
+
 # =========================================================
-# ORCHESTRATOR – PROD EAST
+# ORCHESTRATOR – PROD EAST (NO APPROVAL)
 # =========================================================
   deploy-auto-prod-east:
     if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east' }}
+    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.event.repository.name }}
@@ -92,33 +107,3 @@ jobs:
       environment: prod-east
       region: us-east-1
       operation: ${{ github.event.client_payload.operation }}
-
-# =========================================================
-# DEPLOYMENT SUMMARY
-# =========================================================
-  deployment-summary:
-    runs-on: ubuntu-latest
-    needs:
-      - deploy-prod-west
-      - deploy-prod-east
-      - deploy-auto-prod-west
-      - deploy-auto-prod-east
-    if: >
-      github.event_name == 'repository_dispatch' &&
-      (github.event.client_payload.environment == 'prod-west' ||
-       github.event.client_payload.environment == 'prod-east')
-    steps:
-      - name: Show Deployment Status
-        run: |
-          echo "## Deployment Status" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Environment | Status |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------------|--------|" >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ "${{ github.event.client_payload.environment }}" == "prod-west" ]]; then
-            echo "| prod-west | ✅ Deployed |" >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-          if [[ "${{ github.event.client_payload.environment }}" == "prod-east" ]]; then
-            echo "| prod-west | ✅ Already Deployed |" >> "$GITHUB_STEP_SUMMARY"
-            echo "| prod-east | ✅ Deployed |" >> "$GITHUB_STEP_SUMMARY"
-          fi
