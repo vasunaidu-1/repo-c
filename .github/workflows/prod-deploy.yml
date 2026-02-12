@@ -89,7 +89,7 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ======= SEQUENCE INFO (WEST → EAST SUMMARY) ===========
+# ======= SEQUENCE INFO (ONLY WEST → EAST CASE) =========
 ###########################################################
 
   sequence-info:
@@ -103,22 +103,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - name: Detect previous successful run
+      - name: Detect if previous run was prod-west
         run: |
           CURRENT_RUN_ID=${{ github.run_id }}
 
           RESPONSE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&per_page=5")
+            "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=5")
 
-          PREVIOUS_RUN=$(echo "$RESPONSE" | jq -r --arg CURRENT "$CURRENT_RUN_ID" '
+          PREVIOUS_WEST_RUN=$(echo "$RESPONSE" | jq -r --arg CURRENT "$CURRENT_RUN_ID" '
             .workflow_runs[]
             | select(.id < ($CURRENT | tonumber))
+            | select(.event == "repository_dispatch")
+            | select(.display_title | contains("prod-west"))
             | .id
           ' | head -n 1)
 
-          if [ -n "$PREVIOUS_RUN" ]; then
+          if [ -n "$PREVIOUS_WEST_RUN" ]; then
             echo "## 🌍 Deployment Sequence: WEST → EAST" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "✅ prod-west deployment completed before this prod-east run." >> $GITHUB_STEP_SUMMARY
