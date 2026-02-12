@@ -87,7 +87,7 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ===== VERIFY WEST (ONLY FOR SEQUENCE FLOW) ============
+# ===== VERIFY WEST (ONLY FOR WEST→EAST FLOW) ============
 ###########################################################
 
   verify-west-before-east:
@@ -100,26 +100,26 @@ jobs:
       - name: Validate previous west deployment
         run: |
           echo "Validating west deployment before east..."
-          CURRENT_RUN_ID=${{ github.run_id }}
 
           RESPONSE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&per_page=50")
 
-          WEST_RUN=$(echo "$RESPONSE" | jq -r --arg CURRENT "$CURRENT_RUN_ID" '
+          WEST_RUN=$(echo "$RESPONSE" | jq -r '
             .workflow_runs[]
-            | select(.id < ($CURRENT | tonumber))
             | select(.name == "Production Deployment")
             | .id
           ' | head -n 1)
 
           if [ -z "$WEST_RUN" ]; then
-            echo "❌ ERROR: No previous prod-west run found!"
+            echo "❌ ERROR: No successful prod-west deployment found!"
             exit 1
           fi
 
-          echo "✅ prod-west run detected."
+          echo "## 🌍 Deployment Sequence: WEST → EAST" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "✅ Previous prod-west deployment confirmed." >> "$GITHUB_STEP_SUMMARY"
 
 ###########################################################
 # ================= ORCHESTRATOR EAST ====================
