@@ -54,6 +54,7 @@ jobs:
       region: us-west-2
       operation: ${{ inputs.operation }}
 
+
 # =========================================================
 # MANUAL – PROD EAST (WITH APPROVAL)
 # =========================================================
@@ -77,6 +78,7 @@ jobs:
       region: us-east-1
       operation: ${{ inputs.operation }}
 
+
 # =========================================================
 # ORCHESTRATOR – PROD WEST (NO APPROVAL)
 # =========================================================
@@ -91,29 +93,17 @@ jobs:
       region: us-west-2
       operation: ${{ github.event.client_payload.operation }}
 
+
 # =========================================================
-# ORCHESTRATOR – PROD EAST (WITH COMBINED SUMMARY SUPPORT)
+# ORCHESTRATOR – PROD EAST (NO APPROVAL)
 # =========================================================
   deploy-auto-prod-east:
     if: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east' }}
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Call Shared Deploy Workflow
-        uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-        with:
-          service: ${{ github.event.repository.name }}
-          tag: ${{ github.event.client_payload.tag }}
-          environment: prod-east
-          region: us-east-1
-          operation: ${{ github.event.client_payload.operation }}
-
-      # ✅ Only when west → east flow
-      - name: Add Combined Summary
-        if: ${{ github.event.client_payload.previous_west == 'true' }}
-        run: |
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## 🚀 Combined Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
-          echo "- ✅ prod-west already deployed" >> "$GITHUB_STEP_SUMMARY"
-          echo "- ✅ prod-east deployed successfully" >> "$GITHUB_STEP_SUMMARY"
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ github.event.client_payload.tag }}
+      environment: prod-east
+      region: us-east-1
+      operation: ${{ github.event.client_payload.operation }}
