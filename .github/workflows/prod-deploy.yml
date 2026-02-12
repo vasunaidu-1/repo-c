@@ -26,12 +26,11 @@ on:
 jobs:
 
 ###########################################################
-# ================= MANUAL – PROD WEST ===================
+# MANUAL WEST
 ###########################################################
 
   approval-prod-west:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
-    name: Approval – prod-west
     runs-on: ubuntu-latest
     environment: prod-west
     steps:
@@ -39,7 +38,6 @@ jobs:
 
   deploy-prod-west:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
-    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west
     needs: approval-prod-west
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -50,12 +48,11 @@ jobs:
       operation: ${{ inputs.operation }}
 
 ###########################################################
-# ================= MANUAL – PROD EAST ===================
+# MANUAL EAST
 ###########################################################
 
   approval-prod-east:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
-    name: Approval – prod-east
     runs-on: ubuntu-latest
     environment: prod-east
     steps:
@@ -63,7 +60,6 @@ jobs:
 
   deploy-prod-east:
     if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
-    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east
     needs: approval-prod-east
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
@@ -74,12 +70,11 @@ jobs:
       operation: ${{ inputs.operation }}
 
 ###########################################################
-# ============= ORCHESTRATOR – PROD WEST =================
+# ORCHESTRATOR WEST
 ###########################################################
 
   deploy-auto-prod-west:
     if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-west'
-    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west (orchestrated)
     uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
     with:
       service: ${{ github.event.repository.name }}
@@ -89,25 +84,21 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ============= ORCHESTRATOR – PROD EAST =================
+# ORCHESTRATOR EAST
 ###########################################################
 
   deploy-auto-prod-east:
     if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
-    name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
     runs-on: ubuntu-latest
     steps:
-
-      # ✅ ONLY SHOW SUMMARY FOR WEST → EAST
-      - name: Show west → east sequence summary
+      - name: Sequence Summary (ONLY west → east case)
         if: github.event.client_payload.sequence == 'west-followed-by-east'
         run: |
           echo "## 🌍 Deployment Sequence: WEST → EAST" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ prod-west deployment completed before this prod-east run." >> $GITHUB_STEP_SUMMARY
+          echo "✅ prod-west was deployed before this prod-east run." >> $GITHUB_STEP_SUMMARY
 
-      # ✅ Call your reusable workflow
-      - name: Deploy prod-east
+      - name: Call Shared Deploy
         uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
         with:
           service: ${{ github.event.repository.name }}
