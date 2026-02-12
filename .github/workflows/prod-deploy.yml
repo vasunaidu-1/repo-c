@@ -26,7 +26,53 @@ on:
 jobs:
 
 ###########################################################
-# ORCHESTRATOR WEST
+# ================= MANUAL WEST ==========================
+###########################################################
+
+  approval-prod-west:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
+    runs-on: ubuntu-latest
+    environment: prod-west
+    steps:
+      - run: echo "Approved prod-west"
+
+  deploy-prod-west:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-west'
+    needs: approval-prod-west
+    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-west
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ inputs.tag }}
+      environment: prod-west
+      region: us-west-2
+      operation: ${{ inputs.operation }}
+
+###########################################################
+# ================= MANUAL EAST ==========================
+###########################################################
+
+  approval-prod-east:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
+    runs-on: ubuntu-latest
+    environment: prod-east
+    steps:
+      - run: echo "Approved prod-east"
+
+  deploy-prod-east:
+    if: github.event_name == 'workflow_dispatch' && inputs.environment == 'prod-east'
+    needs: approval-prod-east
+    name: ${{ inputs.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ inputs.tag }}
+      environment: prod-east
+      region: us-east-1
+      operation: ${{ inputs.operation }}
+
+###########################################################
+# ================= ORCHESTRATOR WEST ====================
 ###########################################################
 
   deploy-auto-prod-west:
@@ -41,51 +87,16 @@ jobs:
       operation: ${{ github.event.client_payload.operation }}
 
 ###########################################################
-# ORCHESTRATOR EAST (WITH INLINE VERIFY)
+# ================= ORCHESTRATOR EAST ====================
 ###########################################################
 
   deploy-auto-prod-east:
     if: github.event_name == 'repository_dispatch' && github.event.client_payload.environment == 'prod-east'
-    runs-on: ubuntu-latest
     name: ${{ github.event.client_payload.operation == 'rollback' && 'Rollback' || 'Deploy' }} – prod-east (orchestrated)
-    steps:
-
-      #########################################
-      # VERIFY ONLY FOR WEST→EAST
-      #########################################
-      - name: Verify west deployment (only for sequence)
-        if: github.event.client_payload.sequence == 'west-followed-by-east'
-        run: |
-          echo "🔎 Checking previous prod-west deployment..."
-
-          RESPONSE=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/runs?status=success&per_page=50")
-
-          WEST_RUN=$(echo "$RESPONSE" | jq -r '
-            .workflow_runs[]
-            | select(.name == "Production Deployment")
-            | .id
-          ' | head -n 1)
-
-          if [ -z "$WEST_RUN" ]; then
-            echo "❌ ERROR: No successful prod-west deployment found!"
-            exit 1
-          fi
-
-          echo "## 🌍 Deployment Sequence: WEST → EAST" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ prod-west deployment confirmed." >> $GITHUB_STEP_SUMMARY
-
-      #########################################
-      # ACTUAL DEPLOY (REUSABLE WORKFLOW)
-      #########################################
-      - name: Call reusable workflow
-        uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
-        with:
-          service: ${{ github.event.repository.name }}
-          tag: ${{ github.event.client_payload.tag }}
-          environment: prod-east
-          region: us-east-1
-          operation: ${{ github.event.client_payload.operation }}
+    uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
+    with:
+      service: ${{ github.event.repository.name }}
+      tag: ${{ github.event.client_payload.tag }}
+      environment: prod-east
+      region: us-east-1
+      operation: ${{ github.event.client_payload.operation }}
