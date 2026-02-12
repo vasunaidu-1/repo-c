@@ -2,6 +2,9 @@ name: Production Deployment
 run-name: prod-${{ github.event.client_payload.operation || inputs.operation }}
 
 on:
+  # =========================
+  # MANUAL TRIGGER
+  # =========================
   workflow_dispatch:
     inputs:
       tag:
@@ -20,6 +23,9 @@ on:
           - deployment
           - rollback
 
+  # =========================
+  # ORCHESTRATOR TRIGGER
+  # =========================
   repository_dispatch:
     types: [prod-deploy]
 
@@ -94,7 +100,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Call Shared Deploy Workflow
         uses: vasunaidu-2/shared-workflows/.github/workflows/shared-deploy.yml@main
         with:
@@ -103,9 +108,8 @@ jobs:
           environment: prod-east
           region: us-east-1
           operation: ${{ github.event.client_payload.operation }}
-        secrets: inherit
 
-      # ✅ ONLY when west→east
+      # ✅ Only when west → east flow
       - name: Add Combined Summary
         if: ${{ github.event.client_payload.previous_west == 'true' }}
         run: |
